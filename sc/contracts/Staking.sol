@@ -34,9 +34,39 @@ contract Staking is Ownable {
         stakingToken = IERC20(_stakingToken);
     }
 
+    // ========= Internal Helper Functions =========
+    function getTierRewardRate(uint256 amount) internal view returns (uint256) {
+        if (amount >= tierThresholds[2]) {
+            return tierRewardRates[2];
+        } else if (amount >= tierThresholds[1]) {
+            return tierRewardRates[1];
+        } else if (amount >= tierThresholds[0]) {
+            return tierRewardRates[0];
+        } else {
+            return 0;
+        }
+    }
+
+    function pendingRewards(address _user) public view returns (uint256) {
+        UserInfo storage user = userInfo[_user];
+        if (user.totalStaked == 0) return 0;
+
+        uint256 timeStaked = block.timestamp - user.weightedStartTime;
+        uint256 tierRate = getTierRewardRate(user.totalStaked);
+
+        //careful : this assumes our StakingToken has 18 decimals => adjust this for all tokens !
+        uint256 adjustedRate = ((annualRewardRate + tierRate) * 1e18) / (SECONDS_PER_YEAR * BASE);
+        uint256 totalRewards = (adjustedRate * timeStaked * user.totalStaked) / 1e18;
+
+        return totalRewards;
+    }
+
     // ========= Staking Functions =========
     function stake(uint256 amount) external {
         require(amount >= minimumStakeAmount, "Stake must be at least minimumStakeAmount");
+
+        // Auto-compound pending rewards before updating state
+        _autoCompound(msg.sender);
 
         UserInfo storage user = userInfo[msg.sender];
 
@@ -52,5 +82,56 @@ contract Staking is Ownable {
 
         stakingToken.transferFrom(msg.sender, address(this), amount);
         emit Staked(msg.sender, amount);
+    }
+
+    function withdraw(uint256 amount) external {
+        _autoCompound(msg.sender);
+
+        _withdraw(amount);
+    }
+
+    function withdrawAll() external {
+        _autoCompound(msg.sender);
+
+        _withdraw(userInfo[msg.sender].totalStaked);
+    }
+
+    function _withdraw(uint256 amount) internal {
+        UserInfo storage user = userInfo[msg.sender];
+
+        require(amount > 0 && user.totalStaked >= amount, "Invalid withdrawal amount");
+
+        uint256 penalty = 0;
+
+        if (block.timestamp < user.weightedStartTime + lockPeriod) {
+            // Apply early withdrawal penalty
+            penalty = (amount * earlyWithdrawalPenalty) / BASE;
+            stakingToken.transfer(owner(), penalty);
+        }
+
+        user.totalStaked -= amount;
+
+        if (user.totalStaked == 0) {
+            user.weightedStartTime = 0;
+        }
+
+        stakingToken.transfer(msg.sender, amount - penalty);
+        emit Withdrawn(msg.sender, amount, penalty);
+    }
+
+    // ========= Auto-Compounding =========
+    function _autoCompound(address _user) internal {
+        UserInfo storage user = userInfo[_user];
+        uint256 pending = pendingRewards(_user);
+
+        if (pending > 0) {
+            // Update weighted start time to reflect new total
+            uint256 totalWeight = (user.totalStaked * user.weightedStartTime) + (pending * block.timestamp);
+
+            //auto compound should not have an effect on weightedStartTime
+            //user.weightedStartTime = totalWeight / (user.totalStaked + pending);
+
+            user.totalStaked += pending;
+        }
     }
 }
