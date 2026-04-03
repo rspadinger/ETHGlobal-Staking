@@ -34,6 +34,35 @@ contract Staking is Ownable {
         stakingToken = IERC20(_stakingToken);
     }
 
+    // ========= Admin Functions =========
+    function setTierThresholds(uint256[3] memory _thresholds) external onlyOwner {
+        tierThresholds = _thresholds;
+    }
+
+    function setTierRewardRates(uint256[3] memory _rates) external onlyOwner {
+        tierRewardRates = _rates;
+    }
+
+    function setLockPeriod(uint256 _lockPeriod) external onlyOwner {
+        lockPeriod = _lockPeriod;
+    }
+
+    function setMinimumStakeAmount(uint256 _minimumStakeAmount) external onlyOwner {
+        minimumStakeAmount = _minimumStakeAmount;
+    }
+
+    function setEarlyWithdrawalPenalty(uint256 _penalty) external onlyOwner {
+        require(_penalty <= 100, "Invalid penalty percentage");
+        earlyWithdrawalPenalty = _penalty;
+    }
+
+    function setAnnualRewardRate(uint256 _annualRate) external onlyOwner {
+        require(_annualRate <= 5000, "Rate cannot exceed 50%");
+        annualRewardRate = _annualRate;
+
+        emit AnnualRewardRateUpdated(_annualRate);
+    }
+
     // ========= Internal Helper Functions =========
     function getTierRewardRate(uint256 amount) internal view returns (uint256) {
         if (amount >= tierThresholds[2]) {
