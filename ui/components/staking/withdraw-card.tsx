@@ -99,6 +99,51 @@ export function WithdrawCard({
 
         setError(null)
         setIsWithdrawing(true)
+
+        try {
+            toast({
+                title: "Withdrawing tokens",
+                description: `Withdrawing ${amount} ${tokenSymbol}...`,
+            })
+
+            const withdrawTx = await withdrawTokens(amount)
+
+            toast({
+                title: "Withdrawal submitted",
+                description: "Please confirm the transaction in your wallet",
+            })
+
+            await withdrawTx.wait()
+
+            toast({
+                title: "Withdrawal successful",
+                description: `Successfully withdrew ${amount} ${tokenSymbol}`,
+                variant: "default",
+            })
+
+            // Refresh both staked balance and wallet balance after withdrawal
+            if (account) {
+                await Promise.all([refreshStakedBalance(account), updateBalance(account)])
+            }
+
+            setAmount("")
+            setIsWithdrawing(false)
+        } catch (error: unknown) {
+            console.error("Error withdrawing tokens:", error)
+
+            // More specific error messages
+            const errorObj = error as { reason?: string; message?: string }
+            const errorMessage = errorObj?.reason || errorObj?.message || "Transaction failed. Please try again."
+            setError(errorMessage)
+
+            toast({
+                title: "Transaction failed",
+                description: errorMessage,
+                variant: "destructive",
+            })
+
+            setIsWithdrawing(false)
+        }
     }
 
     const handleMaxAmount = () => {
