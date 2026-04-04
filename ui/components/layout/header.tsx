@@ -1,88 +1,67 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
-import { Wallet, Package, Home } from "lucide-react"
-import { usePrivy } from "@privy-io/react-auth"
-// @ts-expect-error working fine
-import { useAccount, useDisconnect, useBalance } from "wagmi"
+import { Wallet } from "lucide-react"
+import Image from "next/image"
 
-//import { ThemeToggle } from "@/components/layout/theme-toggle"
-//import Image from "next/image"
+export function Header() {
+    const [isConnected, setIsConnected] = useState(false)
+    const [walletAddress, setWalletAddress] = useState("")
+    const [mounted, setMounted] = useState(false)
 
-export default function Header() {
-    // Hooks
-    const { user, ready, authenticated, login, logout } = usePrivy()
-    const { address } = useAccount()
-    const { disconnect } = useDisconnect()
+    // Ensure we only render client-side components after hydration
+    useEffect(() => {
+        setMounted(true)
+        connectWallet()
+    }, [])
+
+    const connectWallet = async () => {
+        if (typeof window !== "undefined" && typeof window.ethereum !== "undefined") {
+            try {
+                const accounts = await window.ethereum.request({ method: "eth_requestAccounts" })
+                setWalletAddress(accounts[0])
+                setIsConnected(true)
+            } catch (error) {
+                console.error("Error connecting to MetaMask", error)
+            }
+        } else {
+            alert("Please install MetaMask to use this feature")
+        }
+    }
+
+    // Format address for display
+    const formatAddress = (address: string) => {
+        return `${address.substring(0, 6)}...${address.substring(address.length - 4)}`
+    }
 
     return (
-        <header className="header-dark">
-            <div className="container mx-auto px-4 py-4 flex justify-between items-center">
-                <Link href="/" className="flex items-center">
-                    <div className="logo-text">
-                        <span className="text-cyan-500 dark:text-cyan-500 font-extrabold pr-1 ">Protocol</span>
-                        <span className="text-indigo-600 dark:text-indigo-600 font-extrabold">Name</span>
+        <header className="bg-secondary py-4 px-6 flex justify-between items-center">
+            <div className="flex items-center">
+                <Link href="/" className="text-white font-bold text-xl">
+                    <div className="flex items-center">
+                        <div>StakeFlow</div>
                     </div>
                 </Link>
-                {/* <Link href="/" className="flex items-center space-x-2">
-                    <div className=" mr-2 relative overflow-hidden rounded-md">
-                        <Image
-                            src="/logo.jpg"
-                            alt="Logo"
-                            width={210}
-                            height={70}
-                            className="object-contain rounded-md opacity-90"
-                            priority
-                        />
-                    </div>
-                </Link> */}
-
-                <nav className="hidden md:flex space-x-6 mx-4">
-                    <Link href="/" className="text-white hover:text-cyan-400 transition-colors">
-                        <span className="flex items-center">
-                            <Home className="mr-1 h-4 w-4" />
-                            Home
-                        </span>
-                    </Link>
-
-                    {ready && user && (
-                        <Link href="/purchases" className="text-white hover:text-cyan-400 transition-colors">
-                            <span className="flex items-center">
-                                <Package className="mr-1 h-4 w-4" />
-                                PAGE
-                            </span>
-                        </Link>
-                    )}
-                </nav>
-
-                <div className="flex items-center space-x-3">
-                    {/* <ThemeToggle /> */}
-                    <Button
-                        disabled={!ready}
-                        onClick={() => {
-                            if (!authenticated && !address) login()
-                            else if (authenticated && !address) logout()
-                            else if (authenticated && address) logout()
-                            else if (!authenticated && address) disconnect()
-                        }}
-                        className="bg-cyan-500 hover:bg-cyan-600 text-white"
+                <nav className="hidden md:flex ml-10 space-x-8">
+                    <Link
+                        href="/"
+                        className="text-white hover:text-primary transition-colors border-b-2 border-primary"
                     >
-                        <span className="flex items-center">
-                            <Wallet className="mr-2 h-4 w-4" />
-                            {!authenticated && !address && "Connect Wallet"}
-                            {authenticated && !address && "Logout"}
-                            {authenticated &&
-                                address &&
-                                `Logout ${address.substring(0, 6)}...${address.substring(address.length - 4)}`}
-                            {!authenticated &&
-                                address &&
-                                `Disconnect ${address.substring(0, 6)}...${address.substring(address.length - 4)}`}
-                        </span>
-                    </Button>
-                </div>
+                        Stake
+                    </Link>
+                </nav>
             </div>
+
+            <Button
+                onClick={connectWallet}
+                variant={isConnected ? undefined : "default"}
+                className={isConnected ? "bg-green-600 hover:bg-green-700 text-white" : ""}
+            >
+                <Wallet className="mr-2 h-4 w-4" />
+                {isConnected ? formatAddress(walletAddress) : "Connect Wallet"}
+            </Button>
         </header>
     )
 }
