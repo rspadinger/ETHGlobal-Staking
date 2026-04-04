@@ -173,3 +173,197 @@ export const getTokenContract = () => getContract("token")
 export const getStakingContract = () => getContract("staking")
 export const getTokenContractWithSigner = async () => getContractWithSigner("token")
 export const getStakingContractWithSigner = async () => getContractWithSigner("staking")
+
+/**
+ * Get token name from the contract
+ */
+export const getTokenName = async (): Promise<string> => {
+    const contract = getTokenContract()
+    if (!contract) {
+        console.error("Token contract not available for getting name")
+        return "Unknown Token"
+    }
+
+    try {
+        const name = await contract.name()
+        console.log("Token name:", name)
+        return name
+    } catch (error) {
+        console.error("Error getting token name:", error)
+        return "Unknown Token"
+    }
+}
+
+/**
+ * Get token symbol from the contract
+ */
+export const getTokenSymbol = async (): Promise<string> => {
+    const contract = getTokenContract()
+    if (!contract) {
+        console.error("Token contract not available for getting symbol")
+        return "???"
+    }
+
+    try {
+        const symbol = await contract.symbol()
+        console.log("Token symbol:", symbol)
+        return symbol
+    } catch (error) {
+        console.error("Error getting token symbol:", error)
+        return "???"
+    }
+}
+
+/**
+ * Get token balance for a specific address
+ */
+export const getTokenBalance = async (address: string): Promise<string> => {
+    const contract = getTokenContract()
+    if (!contract) {
+        throw new Error("Token contract not available")
+    }
+
+    try {
+        const balance = await contract.balanceOf(address)
+        return ethers.formatEther(balance)
+    } catch (error) {
+        console.error("Error getting token balance:", error)
+        throw error
+    }
+}
+
+/**
+ * Get staked balance for a specific address, returns as a formatted string
+ */
+export const getStakedBalance = async (address: string): Promise<string> => {
+    const contract = getStakingContract()
+    if (!contract) {
+        throw new Error("Staking contract not available")
+    }
+
+    try {
+        const userInfo = await contract.userInfo(address)
+        return ethers.formatEther(userInfo[0]) // totalStaked is the first element
+    } catch (error) {
+        console.error("Error getting staked balance:", error)
+        throw error
+    }
+}
+
+/**
+ * Get staked balance as a number for a specific address (for UI display)
+ */
+export const getStakedBalanceFormatted = async (address: string): Promise<number> => {
+    try {
+        const stakedBalance = await getStakedBalance(address)
+        return parseFloat(stakedBalance)
+    } catch (error) {
+        console.error("Error getting formatted staked balance:", error)
+        return 0
+    }
+}
+
+/**
+ * Get pending rewards for a specific address
+ */
+export const getPendingRewards = async (address: string): Promise<string> => {
+    const contract = getStakingContract()
+    if (!contract) {
+        throw new Error("Staking contract not available")
+    }
+
+    try {
+        const rewards = await contract.pendingRewards(address)
+        return ethers.formatEther(rewards)
+    } catch (error) {
+        console.error("Error getting pending rewards:", error)
+        throw error
+    }
+}
+
+/**
+ * Get early withdrawal penalty (in basis points - e.g., 500 = 5%)
+ */
+export const getEarlyWithdrawalPenalty = async (): Promise<number> => {
+    const contract = getStakingContract()
+    if (!contract) {
+        throw new Error("Staking contract not available")
+    }
+
+    try {
+        const penalty = await contract.earlyWithdrawalPenalty()
+        // Return as a number (already in basis points)
+        return Number(penalty)
+    } catch (error) {
+        console.error("Error getting early withdrawal penalty:", error)
+        throw error
+    }
+}
+
+/**
+ * Get lock period in days (converted from seconds)
+ */
+export const getLockPeriod = async (): Promise<number> => {
+    const contract = getStakingContract()
+    if (!contract) {
+        throw new Error("Staking contract not available")
+    }
+
+    try {
+        const lockPeriodSeconds = await contract.lockPeriod()
+        // Convert seconds to days
+        return Math.ceil(Number(lockPeriodSeconds) / (24 * 60 * 60))
+    } catch (error) {
+        console.error("Error getting lock period:", error)
+        throw error
+    }
+}
+
+/**
+ * Get minimum stake amount
+ */
+export const getMinimumStakeAmount = async (): Promise<string> => {
+    const contract = getStakingContract()
+    if (!contract) {
+        throw new Error("Staking contract not available")
+    }
+
+    try {
+        const minAmount = await contract.minimumStakeAmount()
+        return ethers.formatEther(minAmount)
+    } catch (error) {
+        console.error("Error getting minimum stake amount:", error)
+        throw error
+    }
+}
+
+/**
+ * Helper function to handle token operations with error handling
+ */
+const executeTokenOperation = async <T>(
+    operation: string,
+    getContractFn: () => Promise<ethers.Contract | null>,
+    actionFn: (contract: ethers.Contract) => Promise<T>,
+): Promise<T> => {
+    const contract = await getContractFn()
+    if (!contract) {
+        throw new Error(`${operation} - Contract not available`)
+    }
+
+    try {
+        return await actionFn(contract)
+    } catch (error) {
+        console.error(`Error ${operation}:`, error)
+        throw error
+    }
+}
+
+/**
+ * Approve token spending
+ */
+export const approveTokens = async (amount: string): Promise<ethers.TransactionResponse> => {
+    return executeTokenOperation("approving tokens", getTokenContractWithSigner, async (contract) => {
+        const amountInWei = ethers.parseEther(amount)
+        return await contract.approve(STAKING_CONTRACT_ADDRESS, amountInWei)
+    })
+}
