@@ -4,8 +4,8 @@
     "description": "",
     "scripts": {
         "compile": "npx hardhat compile",
-        "postcompile": "mkdir -p ../ui/abi && cp artifacts/contracts/???.sol/???.json ../ui/abi/???.json && cp artifacts/contracts/???.sol/???.json ../ui/abi/???.json",
-        "deploy": "hardhat run scripts/deploy.js"
+        "postcompile": "copy artifacts\\contracts\\StakingToken.sol\\StakingToken.json ..\\ui\\abi\\StakingToken.json && copy artifacts\\contracts\\Staking.sol\\Staking.json ..\\ui\\abi\\Staking.json",
+        "deploy": "npx hardhat run scripts/deploy.js"
     },
     "devDependencies": {
         "@nomicfoundation/hardhat-toolbox": "^3.0.0",

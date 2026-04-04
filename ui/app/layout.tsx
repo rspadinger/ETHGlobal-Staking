@@ -1,42 +1,39 @@
-//@note use css in layout, Metadata for SEO, UserProvider for state management (useContext)
-import "./globals.css"
-import type { Metadata, Viewport } from "next"
+// app/layout.tsx
+import type { Metadata } from "next"
 import { Inter } from "next/font/google"
+import "./globals.css"
+import { Header } from "@/components/layout/header"
+import { Footer } from "@/components/layout/footer"
 import { ThemeProvider } from "@/components/theme-provider"
-import { Toaster } from "@/components/ui/sonner"
+import { Toaster } from "@/components/ui/toaster"
+import { StakingProvider } from "@/lib/staking-context"
+import { WalletProvider } from "@/lib/wallet-context"
 
-import PrivyProviders from "@/lib/web3/privyProviders"
-import Header from "@/components/layout/header"
-import Footer from "@/components/layout/footer"
+const inter = Inter({ subsets: ["latin"] })
 
-const inter = Inter({
-    subsets: ["latin"],
-    display: "swap",
-    variable: "--font-inter",
-})
-
+//@note add metadata to server comp
 export const metadata: Metadata = {
-    title: "TITLE",
-    description: "Description...",
+    title: "Staking App",
+    description: "A simple staking application",
 }
 
-//@note In mobile web design, the maximum-scale property in a viewport settings restricts how much users can zoom in on the page.
-// Setting it to 1 means the user won't be able to zoom in on the page
-export const viewport: Viewport = {
-    maximumScale: 1,
-}
-
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default function RootLayout({
+    children,
+}: Readonly<{
+    children: React.ReactNode
+}>) {
     return (
-        <html lang="en" suppressHydrationWarning className="dark ">
-            <body className={`${inter.className} force-dark min-h-screen flex flex-col`}>
-                <ThemeProvider attribute="class" defaultTheme="dark" enableSystem={false} disableTransitionOnChange>
-                    <PrivyProviders>
-                        <Header />
-                        <main className="flex-1 force-dark">{children}</main>
-                        <Footer />
-                        <Toaster position="top-right" richColors expand />
-                    </PrivyProviders>
+        <html lang="en" suppressHydrationWarning>
+            <body className={`${inter.className} min-h-screen flex flex-col bg-slate-900 text-white`}>
+                <ThemeProvider attribute="class" defaultTheme="dark" enableSystem disableTransitionOnChange>
+                    <WalletProvider>
+                        <StakingProvider>
+                            <Header />
+                            <main className="flex-grow">{children}</main>
+                            <Footer />
+                            <Toaster />
+                        </StakingProvider>
+                    </WalletProvider>
                 </ThemeProvider>
             </body>
         </html>

@@ -1,101 +1,98 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { useSmartContractRead } from "../lib/web3/wagmiHelper"
-import { formatEther, formatUnits } from "viem"
-import { usePrivy } from "@privy-io/react-auth"
-// @ts-expect-error working fine
-import { useAccount, useBalance } from "wagmi"
-import { insertUserAction } from "@/app/actions/user"
+import { StakeCard } from "@/components/staking/stake-card"
+import { WithdrawCard } from "@/components/staking/withdraw-card"
+import {
+    connectWallet,
+    hasEthereum,
+    getTokenName,
+    getTokenSymbol,
+    getEarlyWithdrawalPenalty,
+    getLockPeriod,
+} from "@/lib/contracts"
+import { StakingProvider } from "@/lib/staking-context"
 
-// import { Button } from "@/components/ui/button"
-// import { toast } from "sonner"
-// import { useSendTransaction } from "wagmi"
-// import type { SendTransactionVariables } from "wagmi/query"
-// import { parseEther } from "viem"
+import { useWallet } from "@/lib/wallet-context"
 
-export default function Home() {
-    //****************** hooks //******************
-    const { user, ready } = usePrivy()
-    const { address } = useAccount()
-    const { data: ethBalance, isLoading: loadingEthBalance } = useBalance({ address })
+export default function StakingPage() {
+    const [tokenName, setTokenName] = useState<string>("Loading Token")
+    const [tokenSymbol, setTokenSymbol] = useState<string>("TOKEN")
+    const [earlyWithdrawalPenalty, setEarlyWithdrawalPenalty] = useState<number>(0)
+    const [stakingDuration, setStakingDuration] = useState<number>(0)
 
-    ////****************** state //******************
-    const [var1, setVar1] = useState(0)
+    const { account, isCheckingConnection, isConnected: isWalletConnected } = useWallet()
 
-    //TEST Send TXN => for mainnet testing => seems like smart wallets work only on mainnet
-    // const { data, isPending, isSuccess, sendTransaction } = useSendTransaction()
-    // const transactionRequest: SendTransactionVariables<Config, number> = {
-    //     to: "0x346..." as `0x${string}`,
-    //     value: parseEther("0.001"),
-    //     type: "eip1559",
-    // }
+    // Mock data - we'll replace earlyWithdrawalPenalty and stakingDuration with real values
+    const tokenData = {
+        symbol: "TOKEN",
+        price: 1.25,
+        totalStaked: 1250000,
+        timeStaked: 15, // days
+    }
 
-    //****************** smart contract hooks //******************
-
-    const {
-        data: data1,
-        isLoading: loadingCount,
-        error: errorCount,
-        refetch: refetchCount,
-    } = useSmartContractRead({
-        contract: "contr1",
-        functionName: "getCount",
-        args: [user?.wallet?.address],
-    })
-
-    //****************** useEffect hooks //******************
-
-    //@note save data to backend, when Privy does signup/login
-    // useEffect(() => {
-    //     const insertUser = async () => {
-    //         if (ready && user) {
-    //             //console.log("Privy user:", user.id, user.wallet?.address)
-    //             if (!user.id || !user.wallet?.address) {
-    //                 console.error("Missing user ID or wallet address")
-    //                 return
-    //             }
-
-    //             // save data to DB
-    //             await insertUserAction(user.id, user.wallet?.address)
-    //         }
-    //     }
-
-    //     insertUser()
-    // }, [ready, user])
-
-    //@note polling to update stale data => no need to use useState
+    // Fetch token information and contract parameters
     useEffect(() => {
-        const interval = setInterval(() => {
-            if (ready && user) {
-                refetchCount() // add additional refetches if required
-            }
-        }, 15_000) // check every 15 seconds
+        const fetchContractData = async () => {
+            try {
+                //@note fetch several data using Promise.all
+                const [name, symbol, penalty, lockPeriod] = await Promise.all([
+                    getTokenName(),
+                    getTokenSymbol(),
+                    getEarlyWithdrawalPenalty(),
+                    getLockPeriod(),
+                ])
 
-        return () => clearInterval(interval)
+                setTokenName(name)
+                setTokenSymbol(symbol || tokenData.symbol)
+
+                // Set real values from contract
+                setEarlyWithdrawalPenalty(penalty / 100) // Convert basis points to percentage
+                setStakingDuration(lockPeriod)
+
+                console.log("Contract data loaded:", {
+                    name,
+                    symbol,
+                    earlyWithdrawalPenalty: penalty / 100,
+                    stakingDuration: lockPeriod,
+                })
+            } catch (error) {
+                console.error("Error fetching contract data:", error)
+            }
+        }
+
+        fetchContractData()
     }, [])
 
-    // Optional: one useEffect for logging or global error handling
-    // useEffect(() => {
-    //     if (ready && user) {
-    //         if (errorCount || errorCount2) {
-    //             console.error("Smart contract read error:", {
-    //                 c1: errorCount,
-    //                 c2: errorCount2,
-    //             })
-    //         }
-    //     }
-    // }, [errorCount, errorCount2])
-
-    const isLoading = loadingCount // || loadingCount2 //show spinner in middle of page
-
     return (
-        <div className="force-dark container mx-auto px-4 py-8 md:py-12">
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
-                <div>
-                    <h1 className="hero-title">Title!</h1>
-                    <p className="hero-subtitle max-w-3xl">Short description...!</p>
-                    <p className="hero-subtitle max-w-3xl mt-2">... continued....</p>
+        <div className="container mx-auto py-12 px-4">
+            <div className="max-w-4xl mx-auto">
+                <div className="mb-8">
+                    <h1 className="text-3xl font-bold mb-2">Staking</h1>
+                    <p className="text-muted-foreground">
+                        You can stake {tokenSymbol} ({tokenName}) and earn rewards. A {earlyWithdrawalPenalty}% penalty
+                        applies for early withdrawals (before {stakingDuration} days).
+                    </p>
+                    {isCheckingConnection && (
+                        <p className="text-sm text-muted-foreground mt-2">Checking wallet connection...</p>
+                    )}
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <StakeCard
+                        tokenSymbol={tokenSymbol}
+                        tokenPrice={tokenData.price}
+                        totalStaked={tokenData.totalStaked}
+                    />
+
+                    <WithdrawCard
+                        isWalletConnected={isWalletConnected}
+                        tokenSymbol={tokenSymbol}
+                        tokenPrice={tokenData.price}
+                        earlyWithdrawalPenalty={earlyWithdrawalPenalty}
+                        stakingDuration={stakingDuration}
+                        account={account}
+                    />
                 </div>
             </div>
         </div>
